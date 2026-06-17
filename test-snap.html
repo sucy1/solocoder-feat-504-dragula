@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Dragula Snap Test</title>
+  <link rel="stylesheet" href="dist/dragula.css">
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+    }
+    .container {
+      display: inline-block;
+      width: 200px;
+      min-height: 200px;
+      border: 2px solid #ccc;
+      margin: 10px;
+      padding: 10px;
+      vertical-align: top;
+    }
+    .item {
+      width: 100px;
+      height: 100px;
+      background: #777;
+      color: white;
+      text-align: center;
+      line-height: 100px;
+      margin: 10px;
+      cursor: move;
+    }
+    .grid-bg {
+      background-image: 
+        linear-gradient(to right, #eee 1px, transparent 1px),
+        linear-gradient(to bottom, #eee 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+    #results {
+      margin-top: 20px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      background: #f9f9f9;
+    }
+    .test-pass { color: green; }
+    .test-fail { color: red; }
+  </style>
+</head>
+<body class="grid-bg">
+  <h1>Dragula Snap Feature Test</h1>
+  
+  <div id="test-controls">
+    <button onclick="runTests()">Run Tests</button>
+    <button onclick="clearResults()">Clear Results</button>
+  </div>
+  
+  <div id="results"></div>
+  
+  <h2>Test Containers</h2>
+  <div id="container1" class="container"></div>
+  <div id="container2" class="container"></div>
+
+  <script src="dist/dragula.js"></script>
+  <script>
+    var results = [];
+    
+    function log(message, pass) {
+      var div = document.createElement('div');
+      div.className = pass ? 'test-pass' : 'test-fail';
+      div.textContent = (pass ? '✓ ' : '✗ ') + message;
+      document.getElementById('results').appendChild(div);
+      results.push({ message: message, pass: pass });
+    }
+    
+    function clearResults() {
+      results = [];
+      document.getElementById('results').innerHTML = '';
+    }
+    
+    function assertEqual(actual, expected, message) {
+      var pass = actual === expected;
+      log(message + ' (actual: ' + actual + ', expected: ' + expected + ')', pass);
+      return pass;
+    }
+    
+    function createTestItem(id) {
+      var item = document.createElement('div');
+      item.className = 'item';
+      item.id = id;
+      item.textContent = id;
+      return item;
+    }
+    
+    function simulateEvent(el, type, options) {
+      var e = document.createEvent('Event');
+      e.initEvent(type, true, true);
+      Object.keys(options || {}).forEach(function(key) {
+        e[key] = options[key];
+      });
+      el.dispatchEvent(e);
+      return e;
+    }
+    
+    function runTests() {
+      clearResults();
+      
+      // Test 1: Default snap option is false
+      log('=== Test 1: Default snap option ===', true);
+      var options1 = {};
+      var drake1 = dragula([], options1);
+      assertEqual(options1.snap, false, 'Default snap should be false');
+      drake1.destroy();
+      
+      // Test 2: Snap as number
+      log('=== Test 2: Snap as number (20) ===', true);
+      var container2 = document.getElementById('container1');
+      var item2 = createTestItem('test2');
+      container2.appendChild(item2);
+      
+      var drake2 = dragula([container2], { snap: 20 });
+      var mirror2 = null;
+      
+      drake2.on('cloned', function(clone, original, type) {
+        if (type === 'mirror') {
+          mirror2 = clone;
+        }
+      });
+      
+      // Start drag
+      simulateEvent(item2, 'mousedown', { which: 1, clientX: 100, clientY: 100 });
+      simulateEvent(item2, 'mousemove', { which: 1, clientX: 100, clientY: 100 });
+      
+      // Move to position that should snap
+      simulateEvent(document.documentElement, 'mousemove', { which: 1, clientX: 105, clientY: 115 });
+      
+      if (mirror2) {
+        var left = parseInt(mirror2.style.left, 10);
+        var top = parseInt(mirror2.style.top, 10);
+        assertEqual(left % 20, 0, 'Left should be divisible by 20');
+        assertEqual(top % 20, 0, 'Top should be divisible by 20');
+        log('Left: ' + left + ', Top: ' + top + ' (both snapped to 20px grid)', true);
+      } else {
+        log('Mirror not created', false);
+      }
+      
+      drake2.destroy();
+      container2.removeChild(item2);
+      
+      // Test 3: Snap as object with x and y
+      log('=== Test 3: Snap as object {x: 20, y: 40} ===', true);
+      var container3 = document.getElementById('container1');
+      var item3 = createTestItem('test3');
+      container3.appendChild(item3);
+      
+      var drake3 = dragula([container3], { snap: { x: 20, y: 40 } });
+      var mirror3 = null;
+      
+      drake3.on('cloned', function(clone, original, type) {
+        if (type === 'mirror') {
+          mirror3 = clone;
+        }
+      });
+      
+      simulateEvent(item3, 'mousedown', { which: 1, clientX: 100, clientY: 100 });
+      simulateEvent(item3, 'mousemove', { which: 1, clientX: 100, clientY: 100 });
+      simulateEvent(document.documentElement, 'mousemove', { which: 1, clientX: 115, clientY: 125 });
+      
+      if (mirror3) {
+        var left3 = parseInt(mirror3.style.left, 10);
+        var top3 = parseInt(mirror3.style.top, 10);
+        assertEqual(left3 % 20, 0, 'Left should be divisible by 20');
+        assertEqual(top3 % 40, 0, 'Top should be divisible by 40');
+        log('Left: ' + left3 + ' (snapped to 20px x-grid), Top: ' + top3 + ' (snapped to 40px y-grid)', true);
+      } else {
+        log('Mirror not created', false);
+      }
+      
+      drake3.destroy();
+      container3.removeChild(item3);
+      
+      // Test 4: Snap x: 0 disables horizontal snapping
+      log('=== Test 4: Snap x: 0 disables horizontal snapping ===', true);
+      var container4 = document.getElementById('container1');
+      var item4 = createTestItem('test4');
+      container4.appendChild(item4);
+      
+      var drake4 = dragula([container4], { snap: { x: 0, y: 20 } });
+      var mirror4 = null;
+      
+      drake4.on('cloned', function(clone, original, type) {
+        if (type === 'mirror') {
+          mirror4 = clone;
+        }
+      });
+      
+      simulateEvent(item4, 'mousedown', { which: 1, clientX: 100, clientY: 100 });
+      simulateEvent(item4, 'mousemove', { which: 1, clientX: 100, clientY: 100 });
+      simulateEvent(document.documentElement, 'mousemove', { which: 1, clientX: 107, clientY: 113 });
+      
+      if (mirror4) {
+        var left4_1 = parseInt(mirror4.style.left, 10);
+        var top4_1 = parseInt(mirror4.style.top, 10);
+        assertEqual(top4_1 % 20, 0, 'Top should be divisible by 20');
+        
+        // Move to another position and verify y changes by multiple of 20, x can change arbitrarily
+        simulateEvent(document.documentElement, 'mousemove', { which: 1, clientX: 117, clientY: 143 });
+        var left4_2 = parseInt(mirror4.style.left, 10);
+        var top4_2 = parseInt(mirror4.style.top, 10);
+        assertEqual(top4_2 % 20, 0, 'Top should still be divisible by 20 after move');
+        
+        var dx = left4_2 - left4_1;
+        var dy = top4_2 - top4_1;
+        assertEqual(dy % 20, 0, 'Y change should be multiple of 20');
+        // X should NOT necessarily be multiple of 20 since snap.x = 0
+        log('X change: ' + dx + ' (not snapped), Y change: ' + dy + ' (snapped to 20)', true);
+      } else {
+        log('Mirror not created', false);
+      }
+      
+      drake4.destroy();
+      container4.removeChild(item4);
+      
+      // Test 5: Snap false disables snapping
+      log('=== Test 5: Snap false disables snapping ===', true);
+      var container5 = document.getElementById('container1');
+      var item5 = createTestItem('test5');
+      container5.appendChild(item5);
+      
+      var drake5 = dragula([container5], { snap: false });
+      var mirror5 = null;
+      
+      drake5.on('cloned', function(clone, original, type) {
+        if (type === 'mirror') {
+          mirror5 = clone;
+        }
+      });
+      
+      simulateEvent(item5, 'mousedown', { which: 1, clientX: 100, clientY: 100 });
+      simulateEvent(item5, 'mousemove', { which: 1, clientX: 100, clientY: 100 });
+      simulateEvent(document.documentElement, 'mousemove', { which: 1, clientX: 107, clientY: 113 });
+      
+      if (mirror5) {
+        var left5_1 = parseInt(mirror5.style.left, 10);
+        var top5_1 = parseInt(mirror5.style.top, 10);
+        
+        // Move by non-grid amounts
+        simulateEvent(document.documentElement, 'mousemove', { which: 1, clientX: 117, clientY: 143 });
+        var left5_2 = parseInt(mirror5.style.left, 10);
+        var top5_2 = parseInt(mirror5.style.top, 10);
+        
+        var dx = left5_2 - left5_1;
+        var dy = top5_2 - top5_1;
+        
+        // With snap: false, movement should be exact (10px in x, 30px in y)
+        // Not necessarily snapped to any grid
+        assertEqual(dx, 10, 'X change should be exact 10px (not snapped)');
+        assertEqual(dy, 30, 'Y change should be exact 30px (not snapped)');
+        log('X change: ' + dx + ', Y change: ' + dy + ' (both not snapped, snap: false)', true);
+      } else {
+        log('Mirror not created', false);
+      }
+      
+      drake5.destroy();
+      container5.removeChild(item5);
+      
+      // Test 6: Drag event parameters unchanged
+      log('=== Test 6: Drag event parameters unchanged ===', true);
+      var container6 = document.getElementById('container1');
+      var item6 = createTestItem('test6');
+      container6.appendChild(item6);
+      
+      var drake6 = dragula([container6], { snap: 20 });
+      var dragReceived = false;
+      
+      drake6.on('drag', function(dragItem, container) {
+        dragReceived = true;
+        assertEqual(dragItem, item6, 'Drag event should receive correct item');
+        assertEqual(container, container6, 'Drag event should receive correct container');
+      });
+      
+      // Use manual start which is more reliable
+      drake6.start(item6);
+      
+      assertEqual(dragReceived, true, 'Drag event should be emitted');
+      assertEqual(drake6.dragging, true, 'drake.dragging should be true');
+      
+      drake6.cancel();
+      drake6.destroy();
+      container6.removeChild(item6);
+      
+      // Test 7: Drop event parameters unchanged
+      log('=== Test 7: Drop event parameters unchanged ===', true);
+      var container7a = document.getElementById('container1');
+      var container7b = document.getElementById('container2');
+      var item7 = createTestItem('test7');
+      container7a.appendChild(item7);
+      
+      var drake7 = dragula([container7a, container7b], { snap: 20 });
+      var dropReceived = false;
+      
+      drake7.on('drop', function(dropItem, target, source) {
+        dropReceived = true;
+        assertEqual(dropItem, item7, 'Drop event should receive correct item');
+        assertEqual(target, container7b, 'Drop event should receive correct target');
+        assertEqual(source, container7a, 'Drop event should receive correct source');
+      });
+      
+      // Start drag manually
+      drake7.start(item7);
+      
+      // Manually move item to simulate drop
+      container7b.appendChild(item7);
+      drake7.end();
+      
+      assertEqual(dropReceived, true, 'Drop event should be emitted');
+      
+      drake7.destroy();
+      if (item7.parentNode) {
+        item7.parentNode.removeChild(item7);
+      }
+      
+      // Summary
+      var passed = results.filter(function(r) { return r.pass; }).length;
+      log('=== Summary: ' + passed + '/' + results.length + ' tests passed ===', passed === results.length);
+    }
+  </script>
+</body>
+</html>

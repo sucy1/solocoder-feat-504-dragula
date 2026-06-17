@@ -39,6 +39,18 @@ function dragula (initialContainers, options) {
   if (o.direction === void 0) { o.direction = 'vertical'; }
   if (o.ignoreInputTextSelection === void 0) { o.ignoreInputTextSelection = true; }
   if (o.mirrorContainer === void 0) { o.mirrorContainer = doc.body; }
+  if (o.snap === void 0) { o.snap = false; }
+
+  var _snapX = 0;
+  var _snapY = 0;
+  if (o.snap !== false) {
+    if (typeof o.snap === 'number') {
+      _snapX = _snapY = o.snap;
+    } else if (typeof o.snap === 'object' && o.snap !== null) {
+      _snapX = o.snap.x || 0;
+      _snapY = o.snap.y || 0;
+    }
+  }
 
   var drake = emitter({
     containers: o.containers,
@@ -367,6 +379,13 @@ function dragula (initialContainers, options) {
     var clientY = getCoord('clientY', e) || 0;
     var x = clientX - _offsetX;
     var y = clientY - _offsetY;
+
+    if (_snapX > 0) {
+      x = Math.round(x / _snapX) * _snapX;
+    }
+    if (_snapY > 0) {
+      y = Math.round(y / _snapY) * _snapY;
+    }
 
     _mirror.style.left = x + 'px';
     _mirror.style.top = y + 'px';
